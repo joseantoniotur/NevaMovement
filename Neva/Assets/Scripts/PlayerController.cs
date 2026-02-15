@@ -13,6 +13,10 @@ namespace TarodevController
     [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
     public class PlayerController : MonoBehaviour, IPlayerController
     {
+        [Header("Player Components")]
+        public PlayerInputSystem playerInput;
+
+        [Space]
         [SerializeField] private ScriptableStats _stats;
         private Rigidbody2D _rb;
         private CapsuleCollider2D _col;
@@ -20,15 +24,10 @@ namespace TarodevController
         private Vector2 _frameVelocity;
         private bool _cachedQueryStartInColliders;
 
-        #region Interface
-
         public Vector2 FrameInput => _frameInput.Move;
         public event Action<bool, float> GroundedChanged;
         public event Action Jumped;
-
-        #endregion
-
-        private float _time;
+        public event Action Dodged;
 
         private void Awake()
         {
@@ -38,47 +37,66 @@ namespace TarodevController
             _cachedQueryStartInColliders = Physics2D.queriesStartInColliders;
         }
 
-        private void Update()
-        {
-            _time += Time.deltaTime;
-            GatherInput();
-        }
-
-        private void GatherInput()
+        private void Start()
         {
             _frameInput = new FrameInput
             {
-                JumpDown = Input.GetButtonDown("Jump") || Input.GetKeyDown(KeyCode.C),
-                JumpHeld = Input.GetButton("Jump") || Input.GetKey(KeyCode.C),
-                Move = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"))
+                JumpDown = false,
+                DodgeDown = false,
+                Move = new Vector2(0f, 0f)
             };
 
-            if (_stats.SnapInput)
-            {
-                _frameInput.Move.x = Mathf.Abs(_frameInput.Move.x) < _stats.HorizontalDeadZoneThreshold ? 0 : Mathf.Sign(_frameInput.Move.x);
-                _frameInput.Move.y = Mathf.Abs(_frameInput.Move.y) < _stats.VerticalDeadZoneThreshold ? 0 : Mathf.Sign(_frameInput.Move.y);
-            }
-
-            if (_frameInput.JumpDown)
-            {
-                _jumpToConsume = true;
-                _timeJumpWasPressed = _time;
+            if (playerInput)
+            { 
+                playerInput.OnPlayerMove += OnMove;
+                playerInput.OnPlayerJump += OnJump;
+                playerInput.OnPlayerDodge += OnDodge;
             }
         }
+
+        #region Inputs
+        private void OnMove(Vector2 playerMovement)
+        {
+            _frameInput.Move.x = Mathf.Abs(playerMovement.x) < _stats.HorizontalDeadZoneThreshold ? 0 : Mathf.Sign(playerMovement.x);
+            if (_frameInput.Move.x != 0)
+                transform.localScale = new Vector3(_frameInput.Move.x, 1f, 1f);
+        }
+
+        private void OnJump()
+        {
+            _frameInput.JumpDown = true;
+
+            _jumpToConsume = true;
+            _timeJumpWasPressed = Time.time;
+        }
+
+        private void OnDodge()
+        {
+            _frameInput.DodgeDown = true;
+
+            _dodgeToConsume = true;
+        }
+
+        #endregion
 
         private void FixedUpdate()
         {
             CheckCollisions();
 
-            HandleJump();
             HandleDirection();
+            HandleDodge();
+
+            HandleJump();
             HandleGravity();
-            
+
+            //Debug.Log($"player has jumped {_currentJumpCount} times");
+            Debug.Log($"player velocity {_rb.linearVelocity}");
+
             ApplyMovement();
         }
 
         #region Collisions
-        
+
         private float _frameLeftGrounded = float.MinValue;
         private bool _grounded;
 
@@ -98,6 +116,8 @@ namespace TarodevController
             {
                 _grounded = true;
                 _coyoteUsable = true;
+                _currentJumpCount = 0;
+                _currentDodgeCount = 0;
                 _bufferedJumpUsable = true;
                 _endedJumpEarly = false;
                 GroundedChanged?.Invoke(true, Mathf.Abs(_frameVelocity.y));
@@ -106,7 +126,7 @@ namespace TarodevController
             else if (_grounded && !groundHit)
             {
                 _grounded = false;
-                _frameLeftGrounded = _time;
+                _frameLeftGrounded = Time.time;
                 GroundedChanged?.Invoke(false, 0);
             }
 
@@ -114,7 +134,6 @@ namespace TarodevController
         }
 
         #endregion
-
 
         #region Jumping
 
@@ -124,24 +143,28 @@ namespace TarodevController
         private bool _coyoteUsable;
         private float _timeJumpWasPressed;
 
-        private bool HasBufferedJump => _bufferedJumpUsable && _time < _timeJumpWasPressed + _stats.JumpBuffer;
-        private bool CanUseCoyote => _coyoteUsable && !_grounded && _time < _frameLeftGrounded + _stats.CoyoteTime;
+        private int _currentJumpCount;
+
+        private bool HasBufferedJump => _bufferedJumpUsable && Time.time < _timeJumpWasPressed + _stats.JumpBuffer;
+        private bool CanUseCoyote => _coyoteUsable && !_grounded && Time.time < _frameLeftGrounded + _stats.CoyoteTime;
+        private bool CanJump => _currentJumpCount < _stats.MaxJumpCount;
 
         private void HandleJump()
         {
-            if (!_endedJumpEarly && !_grounded && !_frameInput.JumpHeld && _rb.linearVelocity.y > 0) _endedJumpEarly = true;
+            if (!HasFinishedDodge) return;
 
-            if (!_jumpToConsume && !HasBufferedJump) return;
+            if ((!_jumpToConsume && !HasBufferedJump) || (!_jumpToConsume && !CanJump) || _dodgeToConsume) return;
 
-            if (_grounded || CanUseCoyote) ExecuteJump();
+            if (_grounded || CanUseCoyote || CanJump) ExecuteJump();
 
             _jumpToConsume = false;
         }
 
         private void ExecuteJump()
         {
+            _currentJumpCount += 1;
             _endedJumpEarly = false;
-            _timeJumpWasPressed = 0;
+            _timeJumpWasPressed = Time.time;
             _bufferedJumpUsable = false;
             _coyoteUsable = false;
             _frameVelocity.y = _stats.JumpPower;
@@ -154,6 +177,8 @@ namespace TarodevController
 
         private void HandleDirection()
         {
+            if (!HasFinishedDodge) return;
+
             if (_frameInput.Move.x == 0)
             {
                 var deceleration = _grounded ? _stats.GroundDeceleration : _stats.AirDeceleration;
@@ -167,10 +192,48 @@ namespace TarodevController
 
         #endregion
 
+        #region Dodging
+
+        private bool _dodgeToConsume;
+        private int _currentDodgeCount;
+        private float _timeDodgeWasStarting;
+        private bool HasFinishedDodge  => Time.time > _timeDodgeWasStarting + _stats.DodgeDuration;
+        private bool CanDodge => _currentDodgeCount < _stats.MaxDodgeCount;
+
+        private void HandleDodge()
+        {
+            if (_dodgeToConsume && CanDodge && HasFinishedDodge) ExecuteDodge();
+
+            if (HasFinishedDodge && _dodgeToConsume)
+            {
+                Debug.Log("player has finished dodging");
+
+                KillMomentum();
+                _dodgeToConsume = false;
+                _currentDodgeCount = 0;
+            }
+        }
+
+        private void ExecuteDodge()
+        {
+            KillMomentum();
+
+            _currentDodgeCount += 1;
+            _timeDodgeWasStarting = Time.time;
+
+            _frameVelocity.x = _stats.DodgePower * (_frameInput.Move.x < 1f ? transform.localScale.x : _frameInput.Move.x);
+            _frameVelocity.y = 0f;
+            Dodged?.Invoke();
+        }
+
+        #endregion
+
         #region Gravity
 
         private void HandleGravity()
         {
+            if (!HasFinishedDodge) return;
+
             if (_grounded && _frameVelocity.y <= 0f)
             {
                 _frameVelocity.y = _stats.GroundingForce;
@@ -186,6 +249,7 @@ namespace TarodevController
         #endregion
 
         private void ApplyMovement() => _rb.linearVelocity = _frameVelocity;
+        private void KillMomentum() => _rb.linearVelocity = Vector2.zero;
 
 #if UNITY_EDITOR
         private void OnValidate()
@@ -198,15 +262,16 @@ namespace TarodevController
     public struct FrameInput
     {
         public bool JumpDown;
-        public bool JumpHeld;
+        public bool DodgeDown;
         public Vector2 Move;
     }
 
     public interface IPlayerController
     {
-        public event Action<bool, float> GroundedChanged;
-
-        public event Action Jumped;
         public Vector2 FrameInput { get; }
+
+        public event Action<bool, float> GroundedChanged;
+        public event Action Jumped;
+        public event Action Dodged;
     }
 }
