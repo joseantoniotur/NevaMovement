@@ -13,8 +13,8 @@ public class DodgeMovement : PlayerMovement, IMovementModule
     private bool HasFinishedDodge => Time.time > timeDodgeWasStarting + stats.DodgeDuration;
     private bool CanDodge => currentDodgeCount < stats.MaxDodgeCount;
 
-    public event Action StartDodge;
-    public event Action EndDodge;
+    public event Action OnStartDodge;
+    public event Action OnEndDodge;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -25,11 +25,16 @@ public class DodgeMovement : PlayerMovement, IMovementModule
         if (playerInput)
         {
             playerInput.OnPlayerDodge += OnDodge;
+            playerInput.OnPlayerJump += OnJump;
         }
 
         if (playerControllerManager)
         {
-            playerControllerManager.GroundedChanged += Grounded;
+            playerControllerManager.OnGroundedChanged += Grounded;
+            
+            OnStartDodge += playerControllerManager.DisableGravity;
+            OnEndDodge += playerControllerManager.EnableGravity;
+            
             stats = playerControllerManager.stats;
         }
     }
@@ -37,6 +42,12 @@ public class DodgeMovement : PlayerMovement, IMovementModule
     private void OnDodge()
     {
         dodgeToConsume = true;
+    }
+
+    private void OnJump()
+    {
+        //Cancel dodge
+        EndDodge();
     }
 
     private void Grounded(bool isGrounded, float verticalVelocity)
@@ -52,14 +63,8 @@ public class DodgeMovement : PlayerMovement, IMovementModule
 
         if (HasFinishedDodge && dodgeToConsume)
         {
-            playerControllerManager.KillMomentum();
             currentVelocity = Vector2.zero;
-            dodgeToConsume = false;
-            
-            if(grounded)
-                currentDodgeCount = 0;
-
-            EndDodge?.Invoke();
+            EndDodge();
         }
     }
 
@@ -72,6 +77,17 @@ public class DodgeMovement : PlayerMovement, IMovementModule
 
         currentVelocity.x = stats.DodgePower * transform.localScale.x;
         currentVelocity.y = 0f;
-        StartDodge?.Invoke();
+        OnStartDodge?.Invoke();
+    }
+
+    private void EndDodge()
+    {
+        playerControllerManager.KillMomentum();
+        dodgeToConsume = false;
+
+        if (grounded)
+            currentDodgeCount = 0;
+
+        OnEndDodge?.Invoke();
     }
 }

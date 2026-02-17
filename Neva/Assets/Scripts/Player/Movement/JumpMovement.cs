@@ -31,7 +31,7 @@ public class JumpMovement : PlayerMovement, IMovementModule
 
         if (playerControllerManager)
         {
-            playerControllerManager.GroundedChanged += Grounded;
+            playerControllerManager.OnGroundedChanged += Grounded;
             stats = playerControllerManager.stats;
         }
     }

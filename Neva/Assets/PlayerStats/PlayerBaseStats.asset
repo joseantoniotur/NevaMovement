@@ -34,3 +34,13 @@ MonoBehaviour:
   DodgePower: 25
   MaxDodgeSpeed: 25
   DodgeDuration: 0.25
+  climbLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  rayDistance: 0.5
+  horizontalRayCount: 3
+  ledgeCheckDistance: 1
+  grabCooldown: 0.2
+  climbSpeed: 5
+  skinWidth: 0.02
+  maxSnapDistance: 0.1

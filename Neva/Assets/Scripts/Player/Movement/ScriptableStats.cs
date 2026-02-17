@@ -57,7 +57,7 @@ public class ScriptableStats : ScriptableObject
     [Tooltip("The amount of time we buffer a jump. This allows jump input before actually hitting the ground")]
     public float JumpBuffer = .2f;
 
-    [Header("Dodge")]
+    [Header("DODGE")]
 
     [Tooltip("The maximum amount of jumps permited")]
     public int MaxDodgeCount = 1;
@@ -70,4 +70,15 @@ public class ScriptableStats : ScriptableObject
 
     [Tooltip("The amount of time we buffer a jump. This allows jump input before actually hitting the ground")]
     public float DodgeDuration = .2f;
+
+    [Header("CLIMBING")]
+    public LayerMask climbLayer;
+    public float rayDistance = 0.5f;
+    public int horizontalRayCount = 3;
+    public float ledgeCheckDistance = 0.2f;
+    public float grabCooldown = 0.2f;
+    [Space]
+    public float climbSpeed = 5f;
+    public float skinWidth = 0.02f;
+    public float maxSnapDistance = 0.1f;
 }

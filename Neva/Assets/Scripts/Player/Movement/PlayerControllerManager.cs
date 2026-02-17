@@ -14,28 +14,21 @@ public class PlayerControllerManager : MonoBehaviour
     [HideInInspector]
     public CapsuleCollider2D capsule;
 
-    private bool grounded;
-    private bool isDodging = false;
     private Vector2 velocity;
     private bool _cachedQueryStartInColliders;
+    public bool grounded { private set; get; }
+    public bool gravity { private set; get; }
 
-    public event Action<bool, float> GroundedChanged;
+    public event Action<bool, float> OnGroundedChanged;
 
     private void Awake()
     {
+        gravity = true;
+
         rb = GetComponent<Rigidbody2D>();
         capsule = GetComponent<CapsuleCollider2D>();
 
         _cachedQueryStartInColliders = Physics2D.queriesStartInColliders;
-    }
-
-    private void Start()
-    {
-        if (GetComponent<DodgeMovement>())
-        {
-            GetComponent<DodgeMovement>().StartDodge += StartDodge;
-            GetComponent<DodgeMovement>().EndDodge += EndDodge;
-        }
     }
 
     private void FixedUpdate()
@@ -44,10 +37,7 @@ public class PlayerControllerManager : MonoBehaviour
 
         foreach (var module in playerMovementList)
         {
-            if ((isDodging && module is DodgeMovement) || !isDodging)
-            { 
-                (module as IMovementModule).ModifyVelocity(ref velocity);
-            }
+            (module as IMovementModule).ModifyVelocity(ref velocity);
         }
 
         HandleGravity();
@@ -56,8 +46,8 @@ public class PlayerControllerManager : MonoBehaviour
     }
 
     public void KillMomentum() => rb.linearVelocity = Vector2.zero;
-    private void StartDodge() => isDodging = true;
-    private void EndDodge() => isDodging = false;
+    public void DisableGravity() => gravity = false;
+    public void EnableGravity() => gravity = true;
 
     private void CheckCollisions()
     {
@@ -74,13 +64,13 @@ public class PlayerControllerManager : MonoBehaviour
         if (!grounded && groundHit)
         {
             grounded = true;
-            GroundedChanged?.Invoke(true, Mathf.Abs(velocity.y));
+            OnGroundedChanged?.Invoke(true, Mathf.Abs(velocity.y));
         }
         // Left the Ground
         else if (grounded && !groundHit)
         {
             grounded = false;
-            GroundedChanged?.Invoke(false, 0);
+            OnGroundedChanged?.Invoke(false, 0);
         }
 
         Physics2D.queriesStartInColliders = _cachedQueryStartInColliders;
@@ -88,7 +78,7 @@ public class PlayerControllerManager : MonoBehaviour
 
     private void HandleGravity()
     {
-        if (isDodging) return;
+        if (!gravity) return;
 
         if (grounded && velocity.y <= 0f)
         {
@@ -100,8 +90,37 @@ public class PlayerControllerManager : MonoBehaviour
         }
     }
 
+    [Header("Debug")]
+    [SerializeField] private bool showVelocityGizmo = true;
+    [SerializeField] private float velocityGizmoScale = 0.1f;
+
     private void OnDrawGizmosSelected()
     {
-        Gizmos.DrawLine(transform.localPosition, transform.localPosition + Vector3.down * (stats.GrounderDistance));
+        if (stats == null) return;
+
+        // Ground check line
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawLine(transform.position, transform.position + Vector3.down * stats.GrounderDistance);
+
+        if (!showVelocityGizmo) return;
+
+        // Velocity arrow
+        Gizmos.color = Color.green;
+
+        Vector3 start = transform.position;
+        Vector3 scaledVelocity = (Vector3)velocity * velocityGizmoScale;
+        Vector3 end = start + scaledVelocity;
+
+        Gizmos.DrawLine(start, end);
+
+        // Draw arrow head
+        if (velocity.magnitude > 0.01f)
+        {
+            Vector3 right = Quaternion.Euler(0, 0, 25) * -scaledVelocity.normalized * 0.2f;
+            Vector3 left = Quaternion.Euler(0, 0, -25) * -scaledVelocity.normalized * 0.2f;
+
+            Gizmos.DrawLine(end, end + right);
+            Gizmos.DrawLine(end, end + left);
+        }
     }
 }

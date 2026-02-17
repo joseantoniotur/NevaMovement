@@ -20,7 +20,7 @@ public class BasicMovement : PlayerMovement, IMovementModule
 
         if (playerControllerManager)
         {
-            playerControllerManager.GroundedChanged += Grounded;
+            playerControllerManager.OnGroundedChanged += Grounded;
             stats = playerControllerManager.stats;
         }
     }
@@ -28,9 +28,6 @@ public class BasicMovement : PlayerMovement, IMovementModule
     private void OnMove(Vector2 playerMovement)
     {
         playerMove = Mathf.Abs(playerMovement.x) < stats.HorizontalDeadZoneThreshold ? 0 : Mathf.Sign(playerMovement.x);
-
-        if (playerMove != 0)
-            transform.localScale = new Vector3(Mathf.Sign(playerMove), 1, 1);
     }
 
     private void Grounded(bool isGrounded, float verticalVelocity)
@@ -40,6 +37,8 @@ public class BasicMovement : PlayerMovement, IMovementModule
 
     public void ModifyVelocity(ref Vector2 currentVelocity)
     {
+        if (!playerControllerManager.gravity) return;
+
         if (playerMove == 0)
         {
             var deceleration = grounded ? stats.GroundDeceleration : stats.AirDeceleration;
@@ -47,6 +46,7 @@ public class BasicMovement : PlayerMovement, IMovementModule
         }
         else
         {
+            transform.localScale = new Vector3(Mathf.Sign(playerMove), 1, 1);
             currentVelocity.x = Mathf.MoveTowards(currentVelocity.x, playerMove * stats.MaxSpeed, stats.Acceleration * Time.fixedDeltaTime);
         }
     }
