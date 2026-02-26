@@ -72,11 +72,17 @@ public class ScriptableStats : ScriptableObject
     public float DodgeDuration = .2f;
 
     [Header("CLIMBING")]
+
     public LayerMask climbLayer;
     public float rayDistance = 0.5f;
     public int horizontalRayCount = 3;
     public float ledgeCheckDistance = 0.2f;
     public float grabCooldown = 0.2f;
+    public float surfaceGraceTime = 0.1f;
+
+    [Space]
+    public float rotationSpeed = 10f;
+
     [Space]
     public float climbSpeed = 5f;
     public float skinWidth = 0.02f;

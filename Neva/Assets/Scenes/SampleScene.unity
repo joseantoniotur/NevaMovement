@@ -656,13 +656,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerControllerManager
   stats: {fileID: 11400000, guid: a35c6224e6e19bb48a43cbd2344e2916, type: 2}
   playerMovementList:
+  - {fileID: 574609684}
   - {fileID: 574609681}
   - {fileID: 574609682}
   - {fileID: 574609680}
-  - {fileID: 574609684}
   rb: {fileID: 0}
   capsule: {fileID: 0}
   showVelocityGizmo: 1
+  showDirectionGizmo: 1
   velocityGizmoScale: 0.1
 --- !u!114 &574609684
 MonoBehaviour:
@@ -733,35 +734,35 @@ MonoBehaviour:
       TangentIn:
         x: -0
         y: -0
-        z: -0.34388357
+        z: -0.3492863
       TangentOut:
         x: 0
         y: 0
-        z: 0.34388357
+        z: 0.3492863
       Rotation:
         value:
-          x: 0.70613474
-          y: -0.037063207
-          z: 0.03706332
-          w: -0.70613486
+          x: -0.7034064
+          y: -0.07224549
+          z: 0.07224539
+          w: 0.7034064
     - Position:
-        x: 2.45
+        x: 1.38
         y: 3.4199402
         z: 0
       TangentIn:
         x: -0
         y: -0
-        z: -1.3155527
+        z: -1.297213
       TangentOut:
         x: 0
         y: 0
-        z: 1.7730005
+        z: 1.7700317
       Rotation:
         value:
-          x: 0.7055557
-          y: -0.04681087
-          z: 0.04681088
-          w: -0.7055557
+          x: -0.70679617
+          y: 0.020958047
+          z: -0.020958045
+          w: 0.70679617
     - Position:
         x: 3.445849
         y: 9.586196
@@ -769,17 +770,17 @@ MonoBehaviour:
       TangentIn:
         x: -0
         y: -0
-        z: -1.4840635
+        z: -1.5249579
       TangentOut:
         x: 0
         y: 0
-        z: 0.8227852
+        z: 0.82858604
       Rotation:
         value:
-          x: 0.7035931
-          y: -0.07040447
-          z: 0.07040452
-          w: -0.7035931
+          x: 0.7001369
+          y: -0.099036634
+          z: 0.09903669
+          w: -0.7001369
     - Position:
         x: 3.9
         y: 11.451617
@@ -852,6 +853,24 @@ MonoBehaviour:
           y: -0.5088479
           z: -0.4909927
           w: 0.5088479
+    - Position:
+        x: 4
+        y: 25.75
+        z: 0
+      TangentIn:
+        x: 0
+        y: 0
+        z: -0.5790298
+      TangentOut:
+        x: 0
+        y: 0
+        z: 0.5790298
+      Rotation:
+        value:
+          x: -0.4909927
+          y: -0.5088479
+          z: -0.4909927
+          w: 0.5088479
     m_MetaData:
     - Mode: 0
       Tension: 0.5
@@ -864,6 +883,8 @@ MonoBehaviour:
     - Mode: 0
       Tension: 0.5
     - Mode: 0
+      Tension: 0.5
+    - Mode: 2
       Tension: 0.5
     - Mode: 2
       Tension: 0.5
@@ -906,7 +927,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SplineClimbBehaviour
   splineContainer: {fileID: 605068581}
-  resolution: 10
 --- !u!68 &605068584
 EdgeCollider2D:
   m_ObjectHideFlags: 0
@@ -937,7 +957,7 @@ EdgeCollider2D:
   m_CallbackLayers:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
@@ -945,16 +965,14 @@ EdgeCollider2D:
   m_EdgeRadius: 0.2
   m_Points:
   - {x: 2.0900002, y: 0}
-  - {x: 2.3153944, y: 2.2912464}
-  - {x: 2.6119637, y: 4.5737348}
-  - {x: 2.9631047, y: 6.849865}
-  - {x: 3.3549867, y: 9.118965}
-  - {x: 3.8798594, y: 11.359108}
-  - {x: 4.313163, y: 13.618189}
-  - {x: 4.317251, y: 15.9188175}
-  - {x: 4.184375, y: 18.217615}
-  - {x: 4.0989137, y: 20.51809}
-  - {x: 4.0579777, y: 22.82}
+  - {x: 1.3742995, y: 3.196906}
+  - {x: 2.1943178, y: 6.3629546}
+  - {x: 3.3961267, y: 9.422918}
+  - {x: 4.163392, y: 12.618595}
+  - {x: 4.318427, y: 15.893038}
+  - {x: 4.1339884, y: 19.17628}
+  - {x: 4.067417, y: 22.463211}
+  - {x: 4, y: 25.749998}
   m_AdjacentStartPoint: {x: 0, y: 0}
   m_AdjacentEndPoint: {x: 0, y: 0}
   m_UseAdjacentStartPoint: 0
@@ -1010,16 +1028,14 @@ LineRenderer:
   m_MaskInteraction: 0
   m_Positions:
   - {x: 2.0900002, y: 0, z: 0}
-  - {x: 2.3153944, y: 2.2912464, z: 0}
-  - {x: 2.6119637, y: 4.5737348, z: 0}
-  - {x: 2.9631047, y: 6.849865, z: 0}
-  - {x: 3.3549867, y: 9.118965, z: 0}
-  - {x: 3.8798594, y: 11.359108, z: 0}
-  - {x: 4.313163, y: 13.618189, z: 0}
-  - {x: 4.317251, y: 15.9188175, z: 0}
-  - {x: 4.184375, y: 18.217615, z: 0}
-  - {x: 4.0989137, y: 20.51809, z: 0}
-  - {x: 4.0579777, y: 22.82, z: 0}
+  - {x: 1.3742995, y: 3.196906, z: 0}
+  - {x: 2.1943178, y: 6.3629546, z: 0}
+  - {x: 3.3961267, y: 9.422918, z: 0}
+  - {x: 4.163392, y: 12.618595, z: 0}
+  - {x: 4.318427, y: 15.893038, z: 0}
+  - {x: 4.1339884, y: 19.17628, z: 0}
+  - {x: 4.067417, y: 22.463211, z: 0}
+  - {x: 4, y: 25.749998, z: 0}
   m_Parameters:
     serializedVersion: 3
     widthMultiplier: 1

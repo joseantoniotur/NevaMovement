@@ -18,6 +18,7 @@ public class PlayerControllerManager : MonoBehaviour
     private bool _cachedQueryStartInColliders;
     public bool grounded { private set; get; }
     public bool gravity { private set; get; }
+    public Vector2 movementDirection { private set; get; }
 
     public event Action<bool, float> OnGroundedChanged;
 
@@ -27,6 +28,8 @@ public class PlayerControllerManager : MonoBehaviour
 
         rb = GetComponent<Rigidbody2D>();
         capsule = GetComponent<CapsuleCollider2D>();
+
+        movementDirection = Vector2.right;
 
         _cachedQueryStartInColliders = Physics2D.queriesStartInColliders;
     }
@@ -43,6 +46,9 @@ public class PlayerControllerManager : MonoBehaviour
         HandleGravity();
 
         rb.linearVelocity = velocity;
+        
+        if(velocity.x != 0)
+            movementDirection = new Vector2(Mathf.Sign(velocity.x), 0f).normalized;
     }
 
     public void KillMomentum() => rb.linearVelocity = Vector2.zero;
@@ -92,6 +98,7 @@ public class PlayerControllerManager : MonoBehaviour
 
     [Header("Debug")]
     [SerializeField] private bool showVelocityGizmo = true;
+    [SerializeField] private bool showDirectionGizmo = true;
     [SerializeField] private float velocityGizmoScale = 0.1f;
 
     private void OnDrawGizmosSelected()
@@ -112,15 +119,34 @@ public class PlayerControllerManager : MonoBehaviour
         Vector3 end = start + scaledVelocity;
 
         Gizmos.DrawLine(start, end);
+        
+        Vector3 right;
+        Vector3 left;
 
         // Draw arrow head
         if (velocity.magnitude > 0.01f)
         {
-            Vector3 right = Quaternion.Euler(0, 0, 25) * -scaledVelocity.normalized * 0.2f;
-            Vector3 left = Quaternion.Euler(0, 0, -25) * -scaledVelocity.normalized * 0.2f;
+            right = Quaternion.Euler(0, 0, 25) * -scaledVelocity.normalized * 0.2f;
+            left = Quaternion.Euler(0, 0, -25) * -scaledVelocity.normalized * 0.2f;
 
             Gizmos.DrawLine(end, end + right);
             Gizmos.DrawLine(end, end + left);
         }
+
+        if (!showDirectionGizmo || !capsule) return;
+        
+        // Velocity arrow
+        Gizmos.color = Color.blue;
+
+        start = capsule.bounds.center;
+        end = (Vector2)start + movementDirection;
+
+        Gizmos.DrawLine(start, end);
+
+        right = Quaternion.Euler(0, 0, 25) * -movementDirection.normalized * 0.2f;
+        left = Quaternion.Euler(0, 0, -25) * -movementDirection.normalized * 0.2f;
+
+        Gizmos.DrawLine(end, end + right);
+        Gizmos.DrawLine(end, end + left);
     }
 }

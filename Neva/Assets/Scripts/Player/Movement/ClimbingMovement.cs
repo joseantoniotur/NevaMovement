@@ -1,6 +1,5 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody2D))]
 public class ClimbingMovement : PlayerMovement, IMovementModule
 {
     private ScriptableStats stats;
@@ -8,10 +7,18 @@ public class ClimbingMovement : PlayerMovement, IMovementModule
     private Collider2D playerCollider;
     private RaycastHit2D currentHit;
 
+    private Vector2 surfaceNormal;
+    private Vector2 climbTangent;   // direction along the wall (up/down) – player's up after rotation
+    private int climbSide;           // 1 = right side, -1 = left side (determined at grab)
+
     private float playerMove;
     private bool isClimbing;
 
     private float lastGrabTime;
+    private float lastValidSurfaceTime;
+
+    // Optional event for detachment (e.g., reached top)
+    public System.Action OnDetached;
 
     void Start()
     {
@@ -19,39 +26,34 @@ public class ClimbingMovement : PlayerMovement, IMovementModule
         playerControllerManager = PlayerManager.Instance.playerControllerManager;
 
         playerCollider = playerControllerManager.capsule;
+        stats = playerControllerManager.stats;
 
         if (playerInput)
-        { 
+        {
             playerInput.OnPlayerMove += OnMove;
             playerInput.OnPlayerJump += ExitClimbing;
+            playerInput.OnPlayerDodge += ExitClimbing;
         }
-
-        if (playerControllerManager)
-            stats = playerControllerManager.stats;
-    }
-    private void Update()
-    {
-        CanStartClimbing();
     }
 
-    private void OnMove(Vector2 playerMovement)
+    void Update()
     {
-        if (!isClimbing) return;
-        playerMove = playerMovement.y;
+        if (!isClimbing)
+            TryStartClimbing();
     }
 
-    public void CanStartClimbing()
+    private void OnMove(Vector2 input)
     {
-        if (Time.time - lastGrabTime < stats.grabCooldown || isClimbing) return;
+        if (isClimbing)
+            playerMove = input.y;
+    }
 
-        // Cast ray from the front of the player
-        Vector2 rayOrigin = playerCollider.bounds.center;
-        Vector2 direction = transform.right; // Assuming player faces right
+    private void TryStartClimbing()
+    {
+        if (Time.time - lastGrabTime <= stats.grabCooldown)
+            return;
 
-        RaycastHit2D hit = Physics2D.Raycast(rayOrigin, direction, stats.rayDistance, stats.climbLayer);
-        Debug.DrawRay(rayOrigin, direction * stats.rayDistance, Color.green, 1f);
-
-        if (hit.collider != null && hit.collider is EdgeCollider2D)
+        if (DetectSurface(out RaycastHit2D hit))
         {
             StartClimbing(hit);
         }
@@ -60,154 +62,216 @@ public class ClimbingMovement : PlayerMovement, IMovementModule
     private void StartClimbing(RaycastHit2D hit)
     {
         isClimbing = true;
+
         currentHit = hit;
+        surfaceNormal = hit.normal;
+
+        // Determine which side of the wall we grabbed
+        Vector2 playerToWall = hit.point - (Vector2)transform.position;
+        climbSide = (int)Mathf.Sign(Vector2.Dot(playerToWall, transform.right));
+
+        UpdateClimbTangent();
 
         playerControllerManager.KillMomentum();
         playerControllerManager.DisableGravity();
 
-        lastGrabTime = Time.time;
+        SnapToSurface(); // includes rotation
+
+        lastValidSurfaceTime = Time.time;
+    }
+
+    // Virtual so derived classes can add behaviour
+    protected virtual void OnDetach()
+    {
+        OnDetached?.Invoke();
     }
 
     public void ExitClimbing()
     {
+        if (!isClimbing)
+            return;
+
         isClimbing = false;
 
-        transform.rotation = Quaternion.identity;
         playerControllerManager.EnableGravity();
+        transform.rotation = Quaternion.identity; // return to upright
+
+        OnDetach();
+
+        lastGrabTime = Time.time;
     }
 
-    public void ModifyVelocity(ref Vector2 currentVelocity)
+    private void UpdateClimbTangent()
+    {
+        // Base tangent (perpendicular to normal)
+        Vector2 baseTangent = new Vector2(-surfaceNormal.y, surfaceNormal.x);
+
+        // Flip based on which side of the wall we're on so that +input moves "up" the wall
+        climbTangent = baseTangent * climbSide;
+    }
+
+    public void ModifyVelocity(ref Vector2 velocity)
     {
         if (!isClimbing)
             return;
 
-        if (playerMove == 0)
+        if (!StillOnSurface())
         {
-            currentVelocity.y = Mathf.MoveTowards(currentVelocity.y, 0f, stats.GroundDeceleration * Time.fixedDeltaTime);
-            currentVelocity.x = 0f;
+            if (Time.time - lastValidSurfaceTime > stats.surfaceGraceTime)
+            {
+                ExitClimbing();
+                return;
+            }
         }
         else
         {
-            currentVelocity.y = Mathf.MoveTowards(currentVelocity.y, playerMove * stats.climbSpeed, stats.Acceleration * Time.fixedDeltaTime);
-
-            // Smoothly maintain position relative to climbable surface
-            MaintainPositionOnSurface(ref currentVelocity);
+            lastValidSurfaceTime = Time.time;
         }
 
-        // Prevent movement when at ledge
-        if (CheckForLedge() && playerMove > 0)
+        // Desired movement along the wall
+        Vector2 desiredVelocity = Vector2.zero;
+        if (Mathf.Abs(playerMove) > 0.01f)
         {
-            currentVelocity.y = 0;
+            desiredVelocity = climbTangent * (-playerMove * stats.climbSpeed * Time.fixedDeltaTime);
         }
 
-        // Check if we lost contact with the surface
-        if (!CheckClimbSurface() || playerControllerManager.grounded)
+        // Check if we can move in that direction
+        Vector2 targetPosition = (Vector2)transform.position + desiredVelocity;
+        RaycastHit2D forwardCheck = Physics2D.Raycast(targetPosition, -surfaceNormal, stats.rayDistance * 2f, stats.climbLayer);
+
+        if (forwardCheck.collider != null)
         {
-            ExitClimbing();
+            // Path is clear – update surface data
+            currentHit = forwardCheck;
+            UpdateSurfaceData();
+            velocity = desiredVelocity / Time.fixedDeltaTime;
         }
-    }
-
-    private void MaintainPositionOnSurface(ref Vector2 currentVelocity)
-    {
-        if (currentHit.collider == null) return;
-
-        // Get the closest point on the edge collider
-        Vector2 closestPoint = currentHit.collider.ClosestPoint(transform.position);
-
-        // Calculate the desired distance from the wall
-        float playerHalfWidth = playerCollider.bounds.extents.x;
-        Vector2 wallNormal = (transform.position - (Vector3)closestPoint).normalized;
-
-        // Calculate target position (player should be skinWidth away from wall)
-        Vector2 targetPosition = closestPoint + (wallNormal * (playerHalfWidth + stats.skinWidth));
-
-        // Calculate movement needed
-        Vector2 movementNeeded = targetPosition - (Vector2)transform.position;
-
-        // Don't teleport, smoothly move towards target position
-        float maxMove = stats.maxSnapDistance * Time.fixedDeltaTime * 60f; // Scale by framerate
-        Vector2 smoothMovement = Vector2.MoveTowards(Vector2.zero, movementNeeded, maxMove);
-
-        // Apply smooth correction
-        currentVelocity.x = smoothMovement.x / Time.fixedDeltaTime;
-    }
-
-    private bool CheckClimbSurface()
-    {
-        if (playerCollider == null) return false;
-
-        // Cast multiple rays from different heights
-        float playerHeight = playerCollider.bounds.size.y;
-        float startY = -playerHeight * 0.4f;
-        float endY = playerHeight * 0.4f;
-
-        for (int i = 0; i < stats.horizontalRayCount; i++)
+        else
         {
-            float t = i / (float)(stats.horizontalRayCount - 1);
-            float yOffset = Mathf.Lerp(startY, endY, t);
-
-            Vector2 rayOrigin = (Vector2)(transform.position + (transform.up * yOffset) + (transform.right * playerCollider.bounds.extents.x));
-            Vector2 direction = -transform.right; // Ray towards the wall
-
-            RaycastHit2D hit = Physics2D.Raycast(rayOrigin, direction, stats.rayDistance * 2, stats.climbLayer);
-            Debug.DrawRay(rayOrigin, direction * stats.rayDistance, isClimbing ? Color.cyan : Color.gray);
-
-            if (hit.collider != null && hit.collider is EdgeCollider2D)
+            // Blocked – look around curves
+            Vector2[] checkDirections = new Vector2[]
             {
-                currentHit = hit;
-                return true;
+                climbTangent * 0.5f,
+                (climbTangent + surfaceNormal).normalized * 0.5f,
+                (climbTangent - surfaceNormal).normalized * 0.5f
+            };
+
+            bool foundPath = false;
+            foreach (Vector2 dir in checkDirections)
+            {
+                Vector2 checkPos = (Vector2)transform.position + dir;
+                RaycastHit2D cornerCheck = Physics2D.Raycast(checkPos, -surfaceNormal, stats.rayDistance * 2f, stats.climbLayer);
+
+                if (cornerCheck.collider != null)
+                {
+                    currentHit = cornerCheck;
+                    UpdateSurfaceData();
+                    velocity = climbTangent * (playerMove * stats.climbSpeed);
+                    foundPath = true;
+                    break;
+                }
+            }
+
+            if (!foundPath)
+            {
+                velocity = Vector2.zero;
             }
         }
 
+        SnapToSurface();
+    }
+
+    private bool DetectSurface(out RaycastHit2D hit)
+    {
+        Bounds bounds = playerCollider.bounds;
+        Vector2 origin = bounds.center;
+        Vector2 direction = playerControllerManager.movementDirection.normalized;
+
+        hit = Physics2D.Raycast(origin, direction, stats.rayDistance, stats.climbLayer);
+        return hit.collider != null;
+    }
+
+    private bool StillOnSurface()
+    {
+        Vector2 origin = playerCollider.bounds.center;
+        RaycastHit2D hit = Physics2D.Raycast(origin, -surfaceNormal, stats.rayDistance * 1.5f, stats.climbLayer);
+
+        if (hit.collider != null)
+        {
+            currentHit = hit;
+            return true;
+        }
         return false;
     }
 
-    private bool CheckForLedge()
+    private void UpdateSurfaceData()
     {
-        // Cast ray upward to check for ledge above player
-        Vector2 rayOrigin = (Vector2)transform.position + Vector2.up * playerCollider.bounds.extents.y;
-        Vector2 direction = transform.right;
-
-        RaycastHit2D ledgeHit = Physics2D.Raycast(rayOrigin, direction, stats.ledgeCheckDistance, stats.climbLayer);
-
-        return ledgeHit.collider == null; //Return true if there is not a ledge
+        surfaceNormal = currentHit.normal;
+        UpdateClimbTangent();
     }
 
-    void OnDrawGizmosSelected()
+    private void SnapToSurface()
     {
-        if (!Application.isPlaying || playerCollider == null) return;
-        
-        Vector2 rayOrigin;
+        if (currentHit.collider == null)
+            return;
 
-        // Draw climb detection rays
-        Gizmos.color = isClimbing ? Color.green : Color.red;
+        Vector2 closestPoint = currentHit.collider.ClosestPoint(transform.position);
+        Vector2 targetPosition = closestPoint + surfaceNormal * (stats.skinWidth);
 
-        float playerHeight = playerCollider.bounds.size.y;
-        float startY = -playerHeight * 0.4f;
-        float endY = playerHeight * 0.4f;
+        transform.position = targetPosition;
 
-        for (int i = 0; i < stats.horizontalRayCount; i++)
+        RotateToSurface();
+    }
+
+    private void RotateToSurface()
+    {
+        float angle = Mathf.Atan2(surfaceNormal.y, surfaceNormal.x) * Mathf.Rad2Deg;
+        Quaternion targetRotation = Quaternion.Euler(0f, 0f, angle + 180f);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, stats.rotationSpeed * Time.fixedDeltaTime);
+    }
+
+    void OnDrawGizmos()
+    {
+        if (!Application.isPlaying || playerCollider == null)
+            return;
+
+        Bounds bounds = playerCollider.bounds;
+        Vector2 center = bounds.center;
+
+        if (!isClimbing)
         {
-            float t = i / (float)(stats.horizontalRayCount - 1);
-            float yOffset = Mathf.Lerp(startY, endY, t);
-
-            rayOrigin = (Vector2)(transform.position + (transform.up * yOffset) + (transform.right * playerCollider.bounds.extents.x));
-            Gizmos.DrawRay(rayOrigin, -transform.right * stats.rayDistance);
+            Vector2 moveDir = playerControllerManager != null ? playerControllerManager.movementDirection.normalized : Vector2.right;
+            Gizmos.color = Color.red;
+            Gizmos.DrawRay(center, moveDir * stats.rayDistance);
         }
-
-        //Ledge
-        Gizmos.color = CheckForLedge() ? Color.white : Color.yellow;
-
-        rayOrigin = (Vector2)transform.position + Vector2.up * playerCollider.bounds.extents.y;
-        Vector2 direction = transform.right;
-        Gizmos.DrawRay(rayOrigin, direction);
-
-        // Draw target position if climbing
-        if (isClimbing && currentHit.collider != null)
+        else
         {
-            Gizmos.color = Color.yellow;
-            Vector2 closestPoint = currentHit.collider.ClosestPoint(transform.position);
-            Gizmos.DrawSphere(closestPoint, 0.05f);
+            Gizmos.color = Color.green;
+            Gizmos.DrawRay(center, -surfaceNormal * stats.rayDistance * 1.5f);
+
+            Gizmos.color = Color.blue;
+            Gizmos.DrawRay(center, surfaceNormal * 0.75f);
+
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawRay(center, climbTangent * 0.75f);
+
+            // Show player's up direction (should align with climbTangent)
+            Gizmos.color = Color.white;
+            Gizmos.DrawRay(center, transform.up * 0.5f);
+
+            if (currentHit.collider != null)
+            {
+                Vector2 closestPoint = currentHit.collider.ClosestPoint(transform.position);
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawSphere(closestPoint, 0.06f);
+
+                float halfHeight = bounds.extents.y;
+                Vector2 snapTarget = closestPoint + surfaceNormal * (halfHeight + stats.skinWidth);
+
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawSphere(snapTarget, 0.06f);
+                Gizmos.DrawLine(closestPoint, snapTarget);
+            }
         }
     }
 }

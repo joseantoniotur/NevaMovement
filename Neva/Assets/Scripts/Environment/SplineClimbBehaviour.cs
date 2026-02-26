@@ -9,10 +9,6 @@ public class SplineClimbBehaviour : MonoBehaviour
     [Header("References")]
     [SerializeField] private SplineContainer splineContainer;
 
-    [Header("Sampling")]
-    [Range(2, 200)]
-    [SerializeField] private int resolution = 50;
-
     private EdgeCollider2D edgeCollider;
     private LineRenderer lineRenderer;
 
@@ -43,12 +39,12 @@ public class SplineClimbBehaviour : MonoBehaviour
             return;
 
         List<Vector3> points = new List<Vector3>();
-        lineRenderer.positionCount = resolution + 1;
+        lineRenderer.positionCount = splineContainer.Spline.Count + 1;
 
         // Sample along spline length
-        for (int i = 0; i <= resolution; i++)
+        for (int i = 0; i <= splineContainer.Spline.Count; i++)
         {
-            float t = i / (float)resolution;
+            float t = i / (float)splineContainer.Spline.Count;
 
             Vector3 worldPoint = splineContainer.EvaluatePosition(t);
             Vector3 localPoint = transform.InverseTransformPoint(worldPoint);
@@ -67,9 +63,9 @@ public class SplineClimbBehaviour : MonoBehaviour
         List<Vector2> points = new List<Vector2>();
 
         // Sample along spline length
-        for (int i = 0; i <= resolution; i++)
+        for (int i = 0; i <= splineContainer.Spline.Count; i++)
         {
-            float t = i / (float)resolution;
+            float t = i / (float)splineContainer.Spline.Count;
 
             Vector3 worldPoint = splineContainer.EvaluatePosition(t);
             Vector3 localPoint = transform.InverseTransformPoint(worldPoint);

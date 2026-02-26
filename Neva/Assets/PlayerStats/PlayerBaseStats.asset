@@ -37,10 +37,12 @@ MonoBehaviour:
   climbLayer:
     serializedVersion: 2
     m_Bits: 128
-  rayDistance: 0.5
-  horizontalRayCount: 3
-  ledgeCheckDistance: 1
-  grabCooldown: 0.2
+  rayDistance: 1
+  horizontalRayCount: 4
+  ledgeCheckDistance: 1.75
+  grabCooldown: 0.1
+  surfaceGraceTime: 0.1
+  rotationSpeed: 10
   climbSpeed: 5
-  skinWidth: 0.02
-  maxSnapDistance: 0.1
+  skinWidth: 0.5
+  maxSnapDistance: 0
