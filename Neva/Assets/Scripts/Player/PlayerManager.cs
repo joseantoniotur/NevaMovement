@@ -6,6 +6,8 @@ public class PlayerManager : MonoBehaviour
     public PlayerInputSystem playerInput;
     [HideInInspector]
     public PlayerControllerManager playerControllerManager;
+    [HideInInspector]
+    public PlayerAnimationManager playerAnimationManager;
 
     public static PlayerManager Instance { get; private set; }
 
@@ -21,5 +23,6 @@ public class PlayerManager : MonoBehaviour
 
         playerInput = GetComponent<PlayerInputSystem>();
         playerControllerManager = GetComponent<PlayerControllerManager>();
+        playerAnimationManager = GetComponent<PlayerAnimationManager>();
     }
 }

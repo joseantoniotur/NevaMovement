@@ -13,9 +13,6 @@ public class DodgeMovement : PlayerMovement, IMovementModule
     private bool HasFinishedDodge => Time.time > timeDodgeWasStarting + stats.DodgeDuration;
     private bool CanDodge => currentDodgeCount < stats.MaxDodgeCount;
 
-    public event Action OnStartDodge;
-    public event Action OnEndDodge;
-
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -31,10 +28,6 @@ public class DodgeMovement : PlayerMovement, IMovementModule
         if (playerControllerManager)
         {
             playerControllerManager.OnGroundedChanged += Grounded;
-            
-            OnStartDodge += playerControllerManager.DisableGravity;
-            OnEndDodge += playerControllerManager.EnableGravity;
-            
             stats = playerControllerManager.stats;
         }
     }
@@ -46,7 +39,6 @@ public class DodgeMovement : PlayerMovement, IMovementModule
 
     private void OnJump()
     {
-        //Cancel dodge
         EndDodge();
     }
 
@@ -77,7 +69,8 @@ public class DodgeMovement : PlayerMovement, IMovementModule
 
         currentVelocity.x = stats.DodgePower * transform.localScale.x;
         currentVelocity.y = 0f;
-        OnStartDodge?.Invoke();
+
+        playerControllerManager.AddMovementFlag(MovementFlag.DODGING);
     }
 
     private void EndDodge()
@@ -88,6 +81,20 @@ public class DodgeMovement : PlayerMovement, IMovementModule
         if (grounded)
             currentDodgeCount = 0;
 
-        OnEndDodge?.Invoke();
+        playerControllerManager.RemoveMovementFlag(MovementFlag.DODGING);
+    }
+
+    private void OnDisable()
+    {
+        if (playerInput)
+        {
+            playerInput.OnPlayerDodge -= OnDodge;
+            playerInput.OnPlayerJump -= OnJump;
+        }
+
+        if (playerControllerManager)
+        {
+            playerControllerManager.OnGroundedChanged -= Grounded;
+        }
     }
 }

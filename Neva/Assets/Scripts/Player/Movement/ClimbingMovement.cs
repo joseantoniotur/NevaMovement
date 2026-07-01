@@ -73,7 +73,7 @@ public class ClimbingMovement : PlayerMovement, IMovementModule
         UpdateClimbTangent();
 
         playerControllerManager.KillMomentum();
-        playerControllerManager.DisableGravity();
+        playerControllerManager.AddMovementFlag(MovementFlag.CLIMBING);
 
         SnapToSurface(); // includes rotation
 
@@ -93,7 +93,7 @@ public class ClimbingMovement : PlayerMovement, IMovementModule
 
         isClimbing = false;
 
-        playerControllerManager.EnableGravity();
+        playerControllerManager.RemoveMovementFlag(MovementFlag.CLIMBING);
         transform.rotation = Quaternion.identity; // return to upright
 
         OnDetach();
@@ -228,6 +228,16 @@ public class ClimbingMovement : PlayerMovement, IMovementModule
         float angle = Mathf.Atan2(surfaceNormal.y, surfaceNormal.x) * Mathf.Rad2Deg;
         Quaternion targetRotation = Quaternion.Euler(0f, 0f, angle + 180f);
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, stats.rotationSpeed * Time.fixedDeltaTime);
+    }
+
+    private void OnDisable()
+    {
+        if (playerInput)
+        {
+            playerInput.OnPlayerMove -= OnMove;
+            playerInput.OnPlayerJump -= ExitClimbing;
+            playerInput.OnPlayerDodge -= ExitClimbing;
+        }
     }
 
     void OnDrawGizmos()

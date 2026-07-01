@@ -18,7 +18,6 @@ public class JumpMovement : PlayerMovement, IMovementModule
     private bool CanUseCoyote => coyoteUsable && !grounded && Time.time < frameLeftGrounded + stats.CoyoteTime;
     private bool CanJump => currentJumpCount < stats.MaxJumpCount;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         playerInput = PlayerManager.Instance.playerInput;
@@ -26,7 +25,8 @@ public class JumpMovement : PlayerMovement, IMovementModule
 
         if (playerInput)
         {
-            playerInput.OnPlayerJump += OnJump;
+            playerInput.OnPlayerJump += OnStartJump;
+            playerInput.OnPlayerDodge += FinishJump;
         }
 
         if (playerControllerManager)
@@ -36,7 +36,7 @@ public class JumpMovement : PlayerMovement, IMovementModule
         }
     }
 
-    private void OnJump()
+    private void OnStartJump()
     {
         jumpToConsume = true;
         timeJumpWasPressed = Time.time;
@@ -46,10 +46,19 @@ public class JumpMovement : PlayerMovement, IMovementModule
     {
         grounded = isGrounded;
         if (grounded)
-        { 
-            frameLeftGrounded = Time.time;
+        {
+            FinishJump();
             currentJumpCount = 0;
         }
+        else
+        {
+            frameLeftGrounded = Time.time;
+        }
+    }
+
+    private void FinishJump()
+    {
+        playerControllerManager.RemoveMovementFlag(MovementFlag.JUMPING);
     }
 
     public void ModifyVelocity(ref Vector2 currentVelocity)
@@ -72,6 +81,20 @@ public class JumpMovement : PlayerMovement, IMovementModule
         
         currentVelocity.y = stats.JumpPower;
 
-        //Jumped?.Invoke();
+        playerControllerManager.AddMovementFlag(MovementFlag.JUMPING);
+    }
+
+    private void OnDisable()
+    {
+        if (playerInput)
+        {
+            playerInput.OnPlayerJump -= OnStartJump;
+            playerInput.OnPlayerDodge -= FinishJump;
+        }
+
+        if (playerControllerManager)
+        {
+            playerControllerManager.OnGroundedChanged -= Grounded;
+        }
     }
 }

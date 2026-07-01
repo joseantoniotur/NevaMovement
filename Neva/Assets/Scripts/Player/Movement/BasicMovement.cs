@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class BasicMovement : PlayerMovement, IMovementModule
 {
@@ -7,7 +8,6 @@ public class BasicMovement : PlayerMovement, IMovementModule
     private bool grounded;
     private float playerMove;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         playerInput = PlayerManager.Instance.playerInput;
@@ -15,7 +15,9 @@ public class BasicMovement : PlayerMovement, IMovementModule
 
         if (playerInput)
         {
+            playerInput.OnStartPlayerMove += OnMoveStarted;
             playerInput.OnPlayerMove += OnMove;
+            playerInput.OnEndPlayerMove += OnMoveCanceled;
         }
 
         if (playerControllerManager)
@@ -25,9 +27,17 @@ public class BasicMovement : PlayerMovement, IMovementModule
         }
     }
 
+    private void OnMoveStarted()
+    {
+        playerControllerManager.AddMovementFlag(MovementFlag.WALKING);
+    }
     private void OnMove(Vector2 playerMovement)
     {
         playerMove = Mathf.Abs(playerMovement.x) < stats.HorizontalDeadZoneThreshold ? 0 : Mathf.Sign(playerMovement.x);
+    }
+    private void OnMoveCanceled()
+    {
+        playerControllerManager.RemoveMovementFlag(MovementFlag.WALKING);
     }
 
     private void Grounded(bool isGrounded, float verticalVelocity)
@@ -37,8 +47,6 @@ public class BasicMovement : PlayerMovement, IMovementModule
 
     public void ModifyVelocity(ref Vector2 currentVelocity)
     {
-        if (!playerControllerManager.gravity) return;
-
         if (playerMove == 0)
         {
             var deceleration = grounded ? stats.GroundDeceleration : stats.AirDeceleration;
@@ -48,6 +56,21 @@ public class BasicMovement : PlayerMovement, IMovementModule
         {
             transform.localScale = new Vector3(Mathf.Sign(playerMove), 1, 1);
             currentVelocity.x = Mathf.MoveTowards(currentVelocity.x, playerMove * stats.MaxSpeed, stats.Acceleration * Time.fixedDeltaTime);
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (playerInput)
+        {
+            playerInput.OnStartPlayerMove -= OnMoveStarted;
+            playerInput.OnPlayerMove -= OnMove;
+            playerInput.OnEndPlayerMove -= OnMoveCanceled;
+        }
+
+        if (playerControllerManager)
+        {
+            playerControllerManager.OnGroundedChanged -= Grounded;
         }
     }
 }

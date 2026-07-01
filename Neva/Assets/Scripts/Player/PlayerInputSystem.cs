@@ -7,10 +7,13 @@ public class PlayerInputSystem : MonoBehaviour
     private InputSystem_Actions playerInput;
 
     public event Action OnPlayerJump;
+
     public event Action OnPlayerDodge;
     public event Action OnPlayerAttack;
 
+    public event Action OnStartPlayerMove;
     public event Action<Vector2> OnPlayerMove;
+    public event Action OnEndPlayerMove;
 
     public static PlayerInputSystem Instance { get; private set; }
 
@@ -31,23 +34,32 @@ public class PlayerInputSystem : MonoBehaviour
     {
         playerInput.Enable();
 
+        playerInput.Player.Move.started += OnStartMove;
         playerInput.Player.Move.performed += OnMove;
-        playerInput.Player.Move.canceled += OnMove;
-        playerInput.Player.Jump.performed += OnJump;
-        playerInput.Player.Jump.canceled += OnJump;
+        playerInput.Player.Move.canceled += OnEndMove;
+
+        playerInput.Player.Jump.started += OnStartJump;
+
         playerInput.Player.Dodge.performed += OnDodge;
         playerInput.Player.Dodge.canceled += OnDodge;
     }
 
+    private void OnStartMove(InputAction.CallbackContext context)
+    {
+        OnPlayerMove?.Invoke(context.ReadValue<Vector2>());
+    }
     private void OnMove(InputAction.CallbackContext context)
     {
         OnPlayerMove?.Invoke(context.ReadValue<Vector2>());
     }
-
-    private void OnJump(InputAction.CallbackContext context)
+    private void OnEndMove(InputAction.CallbackContext context)
     {
-        if(context.performed)
-            OnPlayerJump?.Invoke();
+        OnPlayerMove?.Invoke(context.ReadValue<Vector2>());
+    }
+
+    private void OnStartJump(InputAction.CallbackContext context)
+    {
+        OnPlayerJump?.Invoke();
     }
 
     private void OnDodge(InputAction.CallbackContext context)
@@ -60,10 +72,12 @@ public class PlayerInputSystem : MonoBehaviour
     {
         playerInput.Disable();
 
+        playerInput.Player.Move.started -= OnStartMove;
         playerInput.Player.Move.performed -= OnMove;
-        playerInput.Player.Move.canceled -= OnMove;
-        playerInput.Player.Jump.performed -= OnJump;
-        playerInput.Player.Jump.canceled -= OnJump;
+        playerInput.Player.Move.canceled -= OnEndMove;
+
+        playerInput.Player.Jump.started -= OnStartJump;
+
         playerInput.Player.Dodge.performed -= OnDodge;
         playerInput.Player.Dodge.canceled -= OnDodge;
     }

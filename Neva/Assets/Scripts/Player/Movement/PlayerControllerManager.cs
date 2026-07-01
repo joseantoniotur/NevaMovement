@@ -13,19 +13,19 @@ public class PlayerControllerManager : MonoBehaviour
     public Rigidbody2D rb;
     [HideInInspector]
     public CapsuleCollider2D capsule;
+    [HideInInspector]
+    public MovementFlag currentMovementPull; //Los movimientos que se están performando
 
     private Vector2 velocity;
     private bool _cachedQueryStartInColliders;
+
     public bool grounded { private set; get; }
-    public bool gravity { private set; get; }
     public Vector2 movementDirection { private set; get; }
 
     public event Action<bool, float> OnGroundedChanged;
 
     private void Awake()
     {
-        gravity = true;
-
         rb = GetComponent<Rigidbody2D>();
         capsule = GetComponent<CapsuleCollider2D>();
 
@@ -40,10 +40,11 @@ public class PlayerControllerManager : MonoBehaviour
 
         foreach (var module in playerMovementList)
         {
-            (module as IMovementModule).ModifyVelocity(ref velocity);
+            if (module.CanPerformMovement(currentMovementPull))
+            { 
+                (module as IMovementModule).ModifyVelocity(ref velocity);
+            }
         }
-
-        HandleGravity();
 
         rb.linearVelocity = velocity;
         
@@ -52,8 +53,15 @@ public class PlayerControllerManager : MonoBehaviour
     }
 
     public void KillMomentum() => rb.linearVelocity = Vector2.zero;
-    public void DisableGravity() => gravity = false;
-    public void EnableGravity() => gravity = true;
+    
+    public void AddMovementFlag(MovementFlag movementFlagToAdd)
+    {
+        currentMovementPull |= movementFlagToAdd;
+    }
+    public void RemoveMovementFlag(MovementFlag movementFlagToRemove)
+    {
+        currentMovementPull &= ~movementFlagToRemove;
+    }
 
     private void CheckCollisions()
     {
@@ -80,20 +88,6 @@ public class PlayerControllerManager : MonoBehaviour
         }
 
         Physics2D.queriesStartInColliders = _cachedQueryStartInColliders;
-    }
-
-    private void HandleGravity()
-    {
-        if (!gravity) return;
-
-        if (grounded && velocity.y <= 0f)
-        {
-            velocity.y = stats.GroundingForce;
-        }
-        else
-        {
-            velocity.y = Mathf.MoveTowards(velocity.y, -stats.MaxFallSpeed, stats.FallAcceleration * Time.fixedDeltaTime);
-        }
     }
 
     [Header("Debug")]

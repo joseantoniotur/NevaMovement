@@ -11,10 +11,11 @@ public class PlayerManagerEditor : Editor
 
         PlayerManager playerManager = (PlayerManager)target;
 
-        GUILayout.Space(20);
 
         if (playerManager.GetComponent<PlayerControllerManager>())
         {
+            GUILayout.Space(20);
+
             if (!playerManager.GetComponent<BasicMovement>())
             {
                 if (GUILayout.Button("Add Basic Movement"))
@@ -41,11 +42,26 @@ public class PlayerManagerEditor : Editor
         }
         else 
         {
+            GUILayout.Space(20);
+
             if (GUILayout.Button("Add Player Movement"))
             {
                 if (!playerManager.GetComponent<PlayerControllerManager>())
                 {
                     playerManager.playerControllerManager = playerManager.gameObject.AddComponent<PlayerControllerManager>();
+                }
+            }
+        }
+
+        if (!playerManager.GetComponent<PlayerAnimationManager>())
+        {
+            GUILayout.Space(20);
+
+            if (GUILayout.Button("Add Player Animations"))
+            {
+                if (!playerManager.GetComponent<PlayerAnimationManager>())
+                {
+                    playerManager.playerAnimationManager = playerManager.gameObject.AddComponent<PlayerAnimationManager>();
                 }
             }
         }
